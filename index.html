@@ -1566,6 +1566,130 @@
                 padding-bottom: max(15px, env(safe-area-inset-bottom));
             }
         }
+        
+        /* 快速添加表单样式 */
+        .quick-add-form {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 10002;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .quick-add-content {
+            background: white;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        .quick-add-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f8f9fa;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+        }
+        
+        .quick-add-header h3 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 1.3rem;
+        }
+        
+        .quick-add-body {
+            padding: 24px;
+        }
+        
+        .quick-add-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(75, 108, 183, 0.2);
+        }
+        
+        .time-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .time-input-row .form-control {
+            flex: 1;
+        }
+        
+        .time-separator {
+            color: #6c757d;
+            font-weight: 600;
+        }
+        
+        /* 日历添加按钮样式 */
+        .calendar-add-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 20px;
+            height: 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1;
+        }
+        
+        .calendar-day:hover .calendar-add-btn {
+            opacity: 1;
+        }
+        
+        .calendar-add-btn:hover {
+            background-color: #3a5795;
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body>
@@ -1713,8 +1837,8 @@
                 <h3><i class="fas fa-lightbulb"></i> 使用提示</h3>
                 <ul>
                     <li><strong>智能日期识别</strong>：未指定年份默认为今年，未指定月份默认为本月</li>
-                    <li><strong>时间格式</strong>：9:00, 09:00-10:30, 明天9:00, 明天09:00-10:30</li>
-                    <li><strong>日期格式</strong>：1月30日, 30日, 1月30日9:00, 1月30日9:00-10:00</li>
+                    <li><strong>时间格式</strong>：9:00(默认当日9:00-24:00), 09:00-10:30, 明天9:00, 明天09:00-10:30</li>
+                    <li><strong>日期格式</strong>：1月30日(默认当日全天), 30日, 1月30日9:00, 1月30日9:00-10:00</li>
                     <li><strong>日期范围</strong>：1月30日-2月20日, 30日-31日, 2026年1月30日-2026年2月30日</li>
                     <li><strong>智能去重</strong>：相同内容和时间的计划不会重复导入</li>
                 </ul>
@@ -1788,6 +1912,53 @@
         <div class="loader" id="loader">
             <div class="spinner"></div>
             <p>正在处理...</p>
+        </div>
+    </div>
+    
+    <!-- 快速添加表单 -->
+    <div class="quick-add-form" id="quickAddForm">
+        <div class="quick-add-content">
+            <div class="quick-add-header">
+                <h3><i class="fas fa-plus"></i> 添加计划</h3>
+                <button class="modal-close" id="closeQuickAddBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="quick-add-body">
+                <div class="form-group">
+                    <label class="form-label">计划日期</label>
+                    <input type="date" id="quickAddDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">计划内容</label>
+                    <input type="text" id="quickAddContent" class="form-control" placeholder="请输入计划内容" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">时间范围</label>
+                    <div class="time-input-row">
+                        <input type="time" id="quickAddStartTime" class="form-control" value="09:00">
+                        <span class="time-separator">至</span>
+                        <input type="time" id="quickAddEndTime" class="form-control" value="17:00">
+                    </div>
+                    <div style="margin-top: 8px;">
+                        <label style="font-size: 0.9rem; color: #6c757d;">
+                            <input type="checkbox" id="quickAddAllDay"> 全天任务（00:01 - 24:00）
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">备注（可选）</label>
+                    <textarea id="quickAddNotes" class="form-control" rows="3" placeholder="可添加备注信息"></textarea>
+                </div>
+            </div>
+            <div class="quick-add-footer">
+                <button class="btn btn-secondary" id="cancelQuickAddBtn">
+                    <i class="fas fa-times"></i> 取消
+                </button>
+                <button class="btn btn-success" id="saveQuickAddBtn">
+                    <i class="fas fa-check"></i> 添加计划
+                </button>
+            </div>
         </div>
     </div>
     
@@ -1917,6 +2088,18 @@
             const closePreviewBtn = document.getElementById('closePreviewBtn');
             const downloadFileBtn = document.getElementById('downloadFileBtn');
             
+            // 快速添加表单相关DOM元素
+            const quickAddForm = document.getElementById('quickAddForm');
+            const closeQuickAddBtn = document.getElementById('closeQuickAddBtn');
+            const cancelQuickAddBtn = document.getElementById('cancelQuickAddBtn');
+            const saveQuickAddBtn = document.getElementById('saveQuickAddBtn');
+            const quickAddDate = document.getElementById('quickAddDate');
+            const quickAddContent = document.getElementById('quickAddContent');
+            const quickAddStartTime = document.getElementById('quickAddStartTime');
+            const quickAddEndTime = document.getElementById('quickAddEndTime');
+            const quickAddAllDay = document.getElementById('quickAddAllDay');
+            const quickAddNotes = document.getElementById('quickAddNotes');
+            
             // 工作计划数据
             let plans = [];
             let planIdCounter = 1;
@@ -1924,7 +2107,7 @@
             let selectedPlans = new Set();
             let statsChart = null;
             
-            // 日历相关变量
+            // 日历相关变量 - 修复：添加用于记录当前选中的日期
             let currentDate = new Date();
             let selectedDate = new Date(); // 默认选中今天
             let filteredByDate = false; // 是否按日期筛选
@@ -1934,6 +2117,9 @@
                 type: 'all',
                 date: null
             };
+            
+            // 当前选中的日历日期（用于添加计划）
+            let calendarSelectedDate = null;
             
             // 未完成原因选项
             const incompleteReasons = [
@@ -2059,6 +2245,24 @@
                 closePreviewBtn.addEventListener('click', () => filePreviewModal.style.display = 'none');
                 downloadFileBtn.addEventListener('click', downloadPreviewFile);
                 
+                // 快速添加表单事件
+                closeQuickAddBtn.addEventListener('click', () => quickAddForm.style.display = 'none');
+                cancelQuickAddBtn.addEventListener('click', () => quickAddForm.style.display = 'none');
+                saveQuickAddBtn.addEventListener('click', saveQuickAddPlan);
+                quickAddAllDay.addEventListener('change', function() {
+                    if (this.checked) {
+                        quickAddStartTime.value = '00:01';
+                        quickAddEndTime.value = '23:59';
+                        quickAddStartTime.disabled = true;
+                        quickAddEndTime.disabled = true;
+                    } else {
+                        quickAddStartTime.disabled = false;
+                        quickAddEndTime.disabled = false;
+                        quickAddStartTime.value = '09:00';
+                        quickAddEndTime.value = '17:00';
+                    }
+                });
+                
                 // 点击模态框外部关闭模态框
                 statsModal.addEventListener('click', function(e) {
                     if (e.target === statsModal) {
@@ -2069,6 +2273,12 @@
                 filePreviewModal.addEventListener('click', function(e) {
                     if (e.target === filePreviewModal) {
                         filePreviewModal.style.display = 'none';
+                    }
+                });
+                
+                quickAddForm.addEventListener('click', function(e) {
+                    if (e.target === quickAddForm) {
+                        quickAddForm.style.display = 'none';
                     }
                 });
                 
@@ -2144,7 +2354,7 @@
                 const day = date.getDate();
                 const dateStr = date.toDateString();
                 
-                // 修复：检查这一天是否有计划（考虑跨日期计划）
+                // 检查这一天是否有计划（考虑跨日期计划）
                 const dayPlans = getPlansForDate(date);
                 
                 // 确定日期格子的样式类
@@ -2191,13 +2401,128 @@
                     }
                 }
                 
+                // 添加快速添加按钮
+                const addBtn = document.createElement('div');
+                addBtn.className = 'calendar-add-btn';
+                addBtn.innerHTML = '+';
+                addBtn.title = '添加计划';
+                addBtn.dataset.date = dateStr;
+                dayElement.appendChild(addBtn);
+                
                 // 添加点击事件
-                dayElement.addEventListener('click', function() {
+                dayElement.addEventListener('click', function(e) {
+                    // 如果点击的是添加按钮，不触发日期选择
+                    if (e.target.classList.contains('calendar-add-btn')) {
+                        return;
+                    }
+                    
                     const clickedDate = new Date(this.dataset.date);
                     selectDate(clickedDate);
                 });
                 
+                // 添加按钮点击事件
+                addBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const clickedDate = new Date(this.dataset.date);
+                    showQuickAddForm(clickedDate);
+                });
+                
                 return dayElement;
+            }
+            
+            // 显示快速添加表单
+            function showQuickAddForm(date) {
+                calendarSelectedDate = date;
+                quickAddDate.value = formatDateForInput(date);
+                quickAddContent.value = '';
+                quickAddStartTime.value = '09:00';
+                quickAddEndTime.value = '17:00';
+                quickAddAllDay.checked = false;
+                quickAddNotes.value = '';
+                quickAddStartTime.disabled = false;
+                quickAddEndTime.disabled = false;
+                quickAddForm.style.display = 'flex';
+                quickAddContent.focus();
+            }
+            
+            // 保存快速添加的计划
+            function saveQuickAddPlan() {
+                if (!quickAddContent.value.trim()) {
+                    alert('请输入计划内容');
+                    quickAddContent.focus();
+                    return;
+                }
+                
+                const dateValue = quickAddDate.value;
+                const [year, month, day] = dateValue.split('-').map(Number);
+                
+                let startTime, endTime;
+                
+                if (quickAddAllDay.checked) {
+                    // 全天任务：00:01 - 23:59
+                    startTime = new Date(year, month - 1, day, 0, 1, 0, 0);
+                    endTime = new Date(year, month - 1, day, 23, 59, 59, 999);
+                } else {
+                    const startTimeValue = quickAddStartTime.value;
+                    const endTimeValue = quickAddEndTime.value;
+                    
+                    if (!startTimeValue || !endTimeValue) {
+                        alert('请输入时间范围');
+                        return;
+                    }
+                    
+                    const [startHour, startMinute] = startTimeValue.split(':').map(Number);
+                    const [endHour, endMinute] = endTimeValue.split(':').map(Number);
+                    
+                    startTime = new Date(year, month - 1, day, startHour, startMinute, 0, 0);
+                    endTime = new Date(year, month - 1, day, endHour, endMinute, 0, 0);
+                    
+                    // 如果结束时间小于开始时间，结束时间加一天
+                    if (endTime <= startTime) {
+                        endTime.setDate(endTime.getDate() + 1);
+                    }
+                }
+                
+                // 确定计划类型
+                const planType = getPlanType(startTime, endTime);
+                
+                // 创建新计划
+                const newPlan = {
+                    id: planIdCounter++,
+                    startTime: startTime,
+                    endTime: endTime,
+                    content: quickAddContent.value.trim(),
+                    completed: false,
+                    incompleteReason: '',
+                    otherReason: '',
+                    notes: quickAddNotes.value.trim(),
+                    planType: planType,
+                    notified: false,
+                    hasSpecificTime: !quickAddAllDay.checked,
+                    files: []
+                };
+                
+                plans.push(newPlan);
+                
+                // 关闭表单
+                quickAddForm.style.display = 'none';
+                
+                // 更新日历
+                renderCalendar();
+                
+                // 排序并渲染计划列表
+                sortAndRenderPlans();
+                
+                saveToLocalStorage();
+                updateStats();
+                
+                Toastify({
+                    text: "计划已添加",
+                    duration: 3000,
+                    gravity: "top",
+                    position: "center",
+                    backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
+                }).showToast();
             }
             
             // 获取指定日期的所有计划（包括跨日期计划）
@@ -2394,7 +2719,7 @@
                 renderPlanList(plans, true);
             }
             
-            // 从文本生成计划
+            // 从文本生成计划 - 优化时间点识别逻辑
             function generatePlanFromText() {
                 showLoader();
                 
@@ -2549,7 +2874,7 @@
                 }
             }
             
-            // 解析单行计划文本
+            // 解析单行计划文本 - 优化：改进时间点识别逻辑
             function parsePlanLine(line, index) {
                 // 获取当前日期
                 const now = new Date();
@@ -2605,7 +2930,8 @@
                 // 将中文标点转换为英文标点
                 line = line.replace(/：/g, ':').replace(/，/g, ',').replace(/。/g, '.').replace(/；/g, ';');
                 
-                // 处理"点"字表示的时间
+                // 优化：处理"点"字表示的时间，但避免将"练习5min"中的5识别为时间
+                // 使用正则表达式匹配"数字点数字"或"数字点"的格式
                 line = line.replace(/(\d{1,2})点(\d{2})?/g, function(match, hour, minute) {
                     if (minute) {
                         return hour + ':' + minute;
@@ -2673,8 +2999,8 @@
                 const fullDateMatch = line.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
                 if (fullDateMatch && !startDate) {
                     const [_, year, month, day] = fullDateMatch;
-                    startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 0, 0, 0);
-                    endDate = new Date(startDate);
+                    startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 0, 1, 0); // 00:01 作为全天任务的开始
+                    endDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 23, 59, 59);
                     line = line.replace(fullDateMatch[0], '').trim();
                 }
                 
@@ -2682,8 +3008,9 @@
                 const monthDayMatch = line.match(/(\d{1,2})月(\d{1,2})日/);
                 if (monthDayMatch && !startDate) {
                     const [_, month, day] = monthDayMatch;
-                    startDate = new Date(currentYear, parseInt(month) - 1, parseInt(day), 0, 0, 0);
+                    startDate = new Date(currentYear, parseInt(month) - 1, parseInt(day), 0, 1, 0); // 00:01 作为全天任务的开始
                     endDate = new Date(startDate);
+                    endDate.setHours(23, 59, 59);
                     
                     // 如果日期已经过去，设为明年
                     if (startDate < now) {
@@ -2698,8 +3025,9 @@
                 const dayMatch = line.match(/(\d{1,2})日/);
                 if (dayMatch && !startDate) {
                     const [_, day] = dayMatch;
-                    startDate = new Date(currentYear, currentMonth, parseInt(day), 0, 0, 0);
+                    startDate = new Date(currentYear, currentMonth, parseInt(day), 0, 1, 0); // 00:01 作为全天任务的开始
                     endDate = new Date(startDate);
+                    endDate.setHours(23, 59, 59);
                     
                     // 如果日期已经过去，设为下个月
                     if (startDate < now) {
@@ -2712,25 +3040,32 @@
                 
                 // 如果没有解析到具体日期，使用当前日期加上相对天数
                 if (!startDate) {
-                    startDate = new Date(currentYear, currentMonth, currentDate + daysToAdd, 0, 0, 0);
+                    startDate = new Date(currentYear, currentMonth, currentDate + daysToAdd, 0, 1, 0); // 00:01 作为全天任务的开始
                     endDate = new Date(startDate);
+                    endDate.setHours(23, 59, 59);
                 }
                 
-                // 解析时间范围（支持多种格式）
-                const timeRangePattern = /(\d{1,2}):?(\d{2})?\s*[-~到]\s*(\d{1,2}):?(\d{2})?/;
+                // 优化：改进时间解析逻辑，避免将非时间数字识别为时间
+                // 首先，提取可能的时间部分
+                let timeMatchFound = false;
+                
+                // 优化：使用更严格的时间匹配正则表达式
+                // 匹配时间范围格式：9:00-10:00 或 09:00-10:30 或 9:00-10:30
+                const timeRangePattern = /(\d{1,2}):(\d{2})\s*[-~到]\s*(\d{1,2}):(\d{2})/;
                 const timeRangeMatch = line.match(timeRangePattern);
                 
                 if (timeRangeMatch) {
                     hasSpecificTime = true;
+                    timeMatchFound = true;
                     const [_, startHour, startMinute, endHour, endMinute] = timeRangeMatch;
                     
                     // 解析开始时间
                     const startHourNum = parseInt(startHour);
-                    const startMinuteNum = startMinute ? parseInt(startMinute) : 0;
+                    const startMinuteNum = parseInt(startMinute);
                     
                     // 解析结束时间
                     const endHourNum = parseInt(endHour);
-                    const endMinuteNum = endMinute ? parseInt(endMinute) : 0;
+                    const endMinuteNum = parseInt(endMinute);
                     
                     // 设置开始时间
                     startTime = new Date(startDate);
@@ -2748,25 +3083,34 @@
                     }
                     endTime.setHours(adjustedEndHour, endMinuteNum, 0, 0);
                     
-                    // 如果结束时间小于或等于开始时间，则结束时间加一天
+                    // 如果结束时间小于或等于开始时间，则结束时间设为当日23:59:59
                     if (endTime <= startTime) {
-                        endTime.setDate(endTime.getDate() + 1);
+                        // 如果是当天，结束时间设为当日23:59:59
+                        if (endTime.getDate() === startTime.getDate()) {
+                            endTime.setHours(23, 59, 59, 999);
+                        } else {
+                            // 如果是跨天，结束时间设为次日
+                            endTime.setDate(endTime.getDate() + 1);
+                        }
                     }
                     
                     // 从行中移除时间范围
                     line = line.replace(timeRangeMatch[0], '').trim();
                 } 
-                // 解析单个时间点
+                // 优化：匹配单个时间点，但要求后面不能紧跟字母（避免匹配"5min"）
                 else {
-                    const singleTimePattern = /(\d{1,2}):?(\d{2})?/;
+                    // 匹配时间点格式：9:00 或 09:00
+                    // 使用负向前瞻确保时间后面不是字母（避免匹配"5min"）
+                    const singleTimePattern = /(\d{1,2}):(\d{2})(?!\w)/;
                     const singleTimeMatch = line.match(singleTimePattern);
                     
                     if (singleTimeMatch) {
                         hasSpecificTime = true;
+                        timeMatchFound = true;
                         const [_, hour, minute] = singleTimeMatch;
                         
                         const hourNum = parseInt(hour);
-                        const minuteNum = minute ? parseInt(minute) : 0;
+                        const minuteNum = parseInt(minute);
                         
                         // 设置开始时间
                         startTime = new Date(startDate);
@@ -2776,9 +3120,9 @@
                         }
                         startTime.setHours(adjustedHour, minuteNum, 0, 0);
                         
-                        // 默认持续1小时
+                        // 默认持续到当天23:59:59
                         endTime = new Date(startTime);
-                        endTime.setHours(startTime.getHours() + 1);
+                        endTime.setHours(23, 59, 59, 999);
                         
                         // 从行中移除时间
                         line = line.replace(singleTimeMatch[0], '').trim();
@@ -2786,12 +3130,10 @@
                 }
                 
                 // 如果没有解析到具体时间，使用日期作为全天任务
-                if (!hasSpecificTime) {
+                if (!timeMatchFound) {
                     startTime = new Date(startDate);
+                    startTime.setHours(0, 1, 0, 0); // 00:01
                     endTime = new Date(endDate);
-                    
-                    // 全天任务：开始时间为当天0点，结束时间为当天23:59
-                    startTime.setHours(0, 0, 0, 0);
                     endTime.setHours(23, 59, 59, 999);
                 }
                 
@@ -3804,26 +4146,17 @@
                 }
             }
             
-            // 添加新计划
+            // 添加新计划 - 修复：根据当前选中的日期添加计划
             function addNewPlan() {
-                // 确定新计划的开始时间（最后一个计划结束后1小时，或当前时间）
-                let startTime = new Date();
-                if (plans.length > 0) {
-                    // 找到最晚的结束时间
-                    const latestEndTime = plans.reduce((latest, plan) => {
-                        return plan.endTime > latest ? plan.endTime : latest;
-                    }, new Date(0));
-                    
-                    startTime = new Date(latestEndTime);
-                    startTime.setHours(startTime.getHours() + 1);
-                } else {
-                    // 如果没有现有计划，使用当前时间的小时数+1
-                    const now = new Date();
-                    startTime.setHours(now.getHours() + 1, 0, 0, 0);
-                }
+                // 确定使用哪个日期：优先使用日历选中的日期，然后使用当前选中的日期，最后使用今天
+                let targetDate = calendarSelectedDate || selectedDate || new Date();
+                
+                // 确定新计划的开始时间
+                let startTime = new Date(targetDate);
+                startTime.setHours(9, 0, 0, 0); // 默认9:00开始
                 
                 const endTime = new Date(startTime);
-                endTime.setHours(startTime.getHours() + 1);
+                endTime.setHours(17, 0, 0, 0); // 默认17:00结束
                 
                 // 确定计划类型
                 const planType = getPlanType(startTime, endTime);
@@ -3845,6 +4178,9 @@
                 };
                 
                 plans.push(newPlan);
+                
+                // 清空日历选中日期
+                calendarSelectedDate = null;
                 
                 // 更新日历
                 renderCalendar();
@@ -4579,7 +4915,7 @@
             // 辅助函数：格式化时间
             function formatTime(date) {
                 // 如果时间是0点，可能表示全天任务
-                if (date.getHours() === 0 && date.getMinutes() === 0) {
+                if (date.getHours() === 0 && date.getMinutes() <= 1) {
                     return '';
                 }
                 const hours = date.getHours().toString().padStart(2, '0');
