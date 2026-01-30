@@ -2144,11 +2144,8 @@
                 const day = date.getDate();
                 const dateStr = date.toDateString();
                 
-                // 检查这一天是否有计划
-                const dayPlans = plans.filter(plan => {
-                    const planDate = new Date(plan.startTime.getFullYear(), plan.startTime.getMonth(), plan.startTime.getDate());
-                    return planDate.toDateString() === dateStr;
-                });
+                // 修复：检查这一天是否有计划（考虑跨日期计划）
+                const dayPlans = getPlansForDate(date);
                 
                 // 确定日期格子的样式类
                 const dayElement = document.createElement('div');
@@ -2203,6 +2200,24 @@
                 return dayElement;
             }
             
+            // 获取指定日期的所有计划（包括跨日期计划）
+            function getPlansForDate(date) {
+                const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+                const dateEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+                
+                return plans.filter(plan => {
+                    // 计划开始时间在指定日期内，或者计划结束时间在指定日期内
+                    // 或者指定日期在计划的开始和结束时间之间
+                    const planStart = plan.startTime;
+                    const planEnd = plan.endTime;
+                    
+                    // 检查指定日期是否在计划的日期范围内
+                    return (planStart >= dateStart && planStart <= dateEnd) || // 计划开始于该日
+                           (planEnd >= dateStart && planEnd <= dateEnd) || // 计划结束于该日
+                           (planStart <= dateStart && planEnd >= dateEnd); // 计划跨越该日
+                });
+            }
+            
             // 选择日期并筛选计划
             function selectDate(date) {
                 selectedDate = date;
@@ -2229,10 +2244,18 @@
                 filterBadge.innerHTML = `<i class="fas fa-calendar-day"></i> ${dateStr}`;
                 titleElement.appendChild(filterBadge);
                 
-                // 筛选计划
+                // 筛选计划 - 修复：包括在该日期范围内的所有计划
+                const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+                const dateEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+                
                 const filteredPlans = plans.filter(plan => {
-                    const planDate = new Date(plan.startTime.getFullYear(), plan.startTime.getMonth(), plan.startTime.getDate());
-                    return planDate.toDateString() === date.toDateString();
+                    const planStart = plan.startTime;
+                    const planEnd = plan.endTime;
+                    
+                    // 检查计划是否在指定日期范围内
+                    return (planStart >= dateStart && planStart <= dateEnd) || // 计划开始于该日
+                           (planEnd >= dateStart && planEnd <= dateEnd) || // 计划结束于该日
+                           (planStart <= dateStart && planEnd >= dateEnd); // 计划跨越该日
                 });
                 
                 // 渲染筛选后的计划
@@ -2308,9 +2331,15 @@
                     
                     // 日期筛选
                     if (date) {
-                        const planDate = new Date(plan.startTime.getFullYear(), plan.startTime.getMonth(), plan.startTime.getDate());
-                        const filterDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-                        return planDate.getTime() === filterDate.getTime();
+                        const planStart = plan.startTime;
+                        const planEnd = plan.endTime;
+                        const filterDateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+                        const filterDateEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+                        
+                        // 检查计划是否在筛选日期范围内
+                        return (planStart >= filterDateStart && planStart <= filterDateEnd) ||
+                               (planEnd >= filterDateStart && planEnd <= filterDateEnd) ||
+                               (planStart <= filterDateStart && planEnd >= filterDateEnd);
                     }
                     
                     return true;
