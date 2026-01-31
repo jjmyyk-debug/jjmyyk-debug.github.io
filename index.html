@@ -2153,6 +2153,9 @@
             let vibrationEnabled = true;
             let notificationInterval = null;
             
+            // 当前显示的计划（可能是筛选后的）
+            let currentDisplayedPlans = [];
+            
             // 初始化
             function init() {
                 // 从本地存储加载数据
@@ -2180,6 +2183,382 @@
                 
                 // 检查是否支持震动
                 checkVibrationSupport();
+                
+                // 初始化事件委托
+                setupEventDelegation();
+            }
+            
+            // 设置事件委托
+            function setupEventDelegation() {
+                // 文件上传按钮事件委托
+                planList.addEventListener('click', function(e) {
+                    const target = e.target;
+                    
+                    // 文件上传按钮
+                    if (target.closest('.file-upload-btn')) {
+                        const btn = target.closest('.file-upload-btn');
+                        const planId = parseInt(btn.getAttribute('data-id'));
+                        const fileInput = document.querySelector(`.file-upload-input[data-id="${planId}"]`);
+                        if (fileInput) {
+                            fileInput.click();
+                        }
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    // 文件预览按钮
+                    if (target.closest('.preview-file')) {
+                        const btn = target.closest('.preview-file');
+                        const planId = parseInt(btn.getAttribute('data-plan-id'));
+                        const fileIndex = parseInt(btn.getAttribute('data-file-index'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan && plan.files && plan.files[fileIndex]) {
+                            previewFile(plan.files[fileIndex]);
+                        }
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    // 文件删除按钮
+                    if (target.closest('.delete-file')) {
+                        const btn = target.closest('.delete-file');
+                        const planId = parseInt(btn.getAttribute('data-plan-id'));
+                        const fileIndex = parseInt(btn.getAttribute('data-file-index'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan && plan.files && plan.files[fileIndex]) {
+                            if (confirm(`确定要删除文件 "${plan.files[fileIndex].name}" 吗？`)) {
+                                plan.files.splice(fileIndex, 1);
+                                saveToLocalStorage();
+                                
+                                // 重新渲染当前视图
+                                rerenderCurrentView();
+                                
+                                Toastify({
+                                    text: "文件已删除",
+                                    duration: 3000,
+                                    gravity: "top",
+                                    position: "center",
+                                    backgroundColor: "linear-gradient(to right, #ff5e62, #ff9966)",
+                                }).showToast();
+                            }
+                        }
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    // 计划删除按钮
+                    if (target.closest('.action-btn.delete')) {
+                        const btn = target.closest('.action-btn.delete');
+                        const planId = parseInt(btn.getAttribute('data-id'));
+                        
+                        if (confirm('确定要删除这个计划吗？')) {
+                            plans = plans.filter(p => p.id !== planId);
+                            selectedPlans.delete(planId);
+                            
+                            // 更新日历
+                            renderCalendar();
+                            
+                            // 重新渲染当前视图
+                            rerenderCurrentView();
+                            
+                            updateStats();
+                            saveToLocalStorage();
+                            
+                            Toastify({
+                                text: "计划已删除",
+                                duration: 3000,
+                                gravity: "top",
+                                position: "center",
+                                backgroundColor: "linear-gradient(to right, #ff5e62, #ff9966)",
+                            }).showToast();
+                        }
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    // 批量选择复选框
+                    if (target.classList.contains('batch-checkbox')) {
+                        const planId = parseInt(target.getAttribute('data-id'));
+                        const planItem = target.closest('.plan-item');
+                        
+                        if (target.checked) {
+                            selectedPlans.add(planId);
+                            planItem.classList.add('selected');
+                        } else {
+                            selectedPlans.delete(planId);
+                            planItem.classList.remove('selected');
+                        }
+                        
+                        updateSelectedCount();
+                        updateBatchDeleteButton();
+                        return;
+                    }
+                    
+                    // 计划完成复选框
+                    if (target.classList.contains('custom-checkbox')) {
+                        const planId = parseInt(target.getAttribute('data-id'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan) {
+                            plan.completed = target.checked;
+                            
+                            // 更新UI
+                            const planItem = target.closest('.plan-item');
+                            planItem.classList.toggle('completed', target.checked);
+                            planItem.classList.remove('urgent');
+                            
+                            // 显示或隐藏未完成原因选择器
+                            const reasonSelector = planItem.querySelector('.reason-selector');
+                            if (reasonSelector) {
+                                if (target.checked) {
+                                    reasonSelector.style.display = 'none';
+                                } else {
+                                    reasonSelector.style.display = 'block';
+                                }
+                            }
+                            
+                            updateStats();
+                            saveToLocalStorage();
+                            
+                            // 更新日历
+                            renderCalendar();
+                            
+                            // 重新渲染当前视图
+                            rerenderCurrentView();
+                        }
+                        return;
+                    }
+                });
+                
+                // 计划内容编辑事件委托
+                planList.addEventListener('blur', function(e) {
+                    const target = e.target;
+                    
+                    // 计划内容编辑
+                    if (target.classList.contains('plan-content')) {
+                        const planId = parseInt(target.getAttribute('data-id'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan) {
+                            plan.content = target.innerText.trim() || plan.content;
+                            saveToLocalStorage();
+                        }
+                        return;
+                    }
+                    
+                    // 备注编辑
+                    if (target.classList.contains('plan-notes')) {
+                        const planId = parseInt(target.getAttribute('data-id'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan) {
+                            plan.notes = target.innerText.trim();
+                            saveToLocalStorage();
+                        }
+                        return;
+                    }
+                    
+                    // 其他原因输入
+                    if (target.classList.contains('other-reason-input')) {
+                        const planId = parseInt(target.getAttribute('data-id'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan) {
+                            plan.otherReason = target.value.trim();
+                            saveToLocalStorage();
+                        }
+                        return;
+                    }
+                }, true);
+                
+                // 日期时间输入事件委托
+                planList.addEventListener('change', function(e) {
+                    const target = e.target;
+                    
+                    // 日期输入
+                    if (target.classList.contains('start-date') || target.classList.contains('end-date')) {
+                        const planId = parseInt(target.getAttribute('data-id'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan) {
+                            const dateValue = target.value;
+                            const [year, month, day] = dateValue.split('-').map(Number);
+                            
+                            if (target.classList.contains('start-date')) {
+                                plan.startTime.setFullYear(year, month - 1, day);
+                            } else {
+                                plan.endTime.setFullYear(year, month - 1, day);
+                                
+                                // 确保结束时间在开始时间之后
+                                if (plan.endTime <= plan.startTime) {
+                                    plan.endTime.setDate(plan.endTime.getDate() + 1);
+                                    target.value = formatDateForInput(plan.endTime);
+                                }
+                            }
+                            
+                            // 更新计划类型
+                            plan.planType = getPlanType(plan.startTime, plan.endTime);
+                            
+                            // 重置通知状态
+                            plan.notified = false;
+                            saveToLocalStorage();
+                            updateStats();
+                            
+                            // 更新日历
+                            renderCalendar();
+                            
+                            // 重新渲染当前视图
+                            rerenderCurrentView();
+                        }
+                        return;
+                    }
+                    
+                    // 时间输入
+                    if (target.classList.contains('start-time') || target.classList.contains('end-time')) {
+                        const planId = parseInt(target.getAttribute('data-id'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan) {
+                            const timeValue = target.value;
+                            const [hours, minutes] = timeValue.split(':').map(Number);
+                            
+                            if (target.classList.contains('start-time')) {
+                                plan.startTime.setHours(hours, minutes, 0, 0);
+                                plan.hasSpecificTime = true;
+                            } else {
+                                plan.endTime.setHours(hours, minutes, 0, 0);
+                                plan.hasSpecificTime = true;
+                                
+                                // 确保结束时间在开始时间之后
+                                if (plan.endTime <= plan.startTime) {
+                                    plan.endTime.setDate(plan.endTime.getDate() + 1);
+                                    target.value = formatTime(plan.endTime);
+                                }
+                            }
+                            
+                            // 更新计划类型
+                            plan.planType = getPlanType(plan.startTime, plan.endTime);
+                            
+                            // 重置通知状态
+                            plan.notified = false;
+                            saveToLocalStorage();
+                            updateStats();
+                            
+                            // 更新日历
+                            renderCalendar();
+                            
+                            // 重新渲染当前视图
+                            rerenderCurrentView();
+                        }
+                        return;
+                    }
+                    
+                    // 未完成原因选择
+                    if (target.classList.contains('reason-select')) {
+                        const planId = parseInt(target.getAttribute('data-id'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan) {
+                            plan.incompleteReason = target.value;
+                            
+                            // 如果是"其他"，显示输入框
+                            const otherInput = target.parentElement.querySelector('.other-reason-input');
+                            if (target.value === 'other') {
+                                otherInput.style.display = 'block';
+                                if (plan.otherReason) {
+                                    otherInput.value = plan.otherReason;
+                                }
+                            } else {
+                                otherInput.style.display = 'none';
+                                plan.otherReason = '';
+                            }
+                            
+                            saveToLocalStorage();
+                        }
+                        return;
+                    }
+                });
+                
+                // 文件输入事件委托
+                planList.addEventListener('change', function(e) {
+                    const target = e.target;
+                    
+                    if (target.classList.contains('file-upload-input')) {
+                        const planId = parseInt(target.getAttribute('data-id'));
+                        const plan = plans.find(p => p.id === planId);
+                        
+                        if (plan && target.files.length > 0) {
+                            // 读取文件
+                            const files = Array.from(target.files);
+                            let filesProcessed = 0;
+                            const totalFiles = files.length;
+                            
+                            showLoader();
+                            
+                            files.forEach(file => {
+                                readFileAsBase64(file).then(base64Data => {
+                                    const fileData = {
+                                        name: file.name,
+                                        type: file.type,
+                                        size: file.size,
+                                        lastModified: file.lastModified,
+                                        data: base64Data
+                                    };
+                                    
+                                    if (!plan.files) {
+                                        plan.files = [];
+                                    }
+                                    
+                                    plan.files.push(fileData);
+                                    filesProcessed++;
+                                    
+                                    // 所有文件都处理完毕
+                                    if (filesProcessed === totalFiles) {
+                                        saveToLocalStorage();
+                                        
+                                        // 重新渲染当前视图
+                                        rerenderCurrentView();
+                                        
+                                        hideLoader();
+                                        
+                                        Toastify({
+                                            text: `已添加 ${totalFiles} 个文件`,
+                                            duration: 3000,
+                                            gravity: "top",
+                                            position: "center",
+                                            backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
+                                        }).showToast();
+                                    }
+                                }).catch(error => {
+                                    console.error('读取文件失败:', error);
+                                    filesProcessed++;
+                                    
+                                    if (filesProcessed === totalFiles) {
+                                        hideLoader();
+                                        alert('部分文件读取失败，请重试');
+                                    }
+                                });
+                            });
+                            
+                            // 重置文件输入
+                            target.value = '';
+                        }
+                        return;
+                    }
+                });
+            }
+            
+            // 重新渲染当前视图
+            function rerenderCurrentView() {
+                if (filteredByDate) {
+                    filterPlansByDate(selectedDate);
+                } else if (filteredByFilter) {
+                    applyFilter();
+                } else {
+                    renderPlanList(plans, true);
+                }
             }
             
             // 绑定事件
@@ -2510,8 +2889,8 @@
                 // 更新日历
                 renderCalendar();
                 
-                // 排序并渲染计划列表
-                sortAndRenderPlans();
+                // 重新渲染当前视图
+                rerenderCurrentView();
                 
                 saveToLocalStorage();
                 updateStats();
@@ -2582,6 +2961,9 @@
                            (planEnd >= dateStart && planEnd <= dateEnd) || // 计划结束于该日
                            (planStart <= dateStart && planEnd >= dateEnd); // 计划跨越该日
                 });
+                
+                // 保存当前显示的计划
+                currentDisplayedPlans = filteredPlans;
                 
                 // 渲染筛选后的计划
                 renderPlanList(filteredPlans, false);
@@ -2670,6 +3052,9 @@
                     return true;
                 });
                 
+                // 保存当前显示的计划
+                currentDisplayedPlans = filteredPlans;
+                
                 // 渲染筛选后的计划
                 renderPlanList(filteredPlans, true);
             }
@@ -2714,6 +3099,9 @@
                 typeFilter.value = 'all';
                 dateFilter.value = formatDateForInput(new Date());
                 currentFilter = { status: 'all', type: 'all', date: null };
+                
+                // 保存当前显示的计划
+                currentDisplayedPlans = plans;
                 
                 // 渲染所有计划
                 renderPlanList(plans, true);
@@ -2764,8 +3152,11 @@
                     // 添加新计划到总列表
                     plans.push(...newPlans);
                     
-                    // 排序并渲染计划列表
-                    sortAndRenderPlans();
+                    // 保存当前显示的计划
+                    currentDisplayedPlans = plans;
+                    
+                    // 重新渲染当前视图
+                    rerenderCurrentView();
                     
                     // 保存到本地存储
                     saveToLocalStorage();
@@ -3222,16 +3613,8 @@
                     return a.startTime - b.startTime;
                 });
                 
-                if (filteredByDate) {
-                    // 如果正在按日期筛选，重新筛选当前选中日期的计划
-                    filterPlansByDate(selectedDate);
-                } else if (filteredByFilter) {
-                    // 如果正在按筛选器筛选，重新应用筛选器
-                    applyFilter();
-                } else {
-                    // 否则渲染所有计划
-                    renderPlanList(plans, true);
-                }
+                // 重新渲染当前视图
+                rerenderCurrentView();
                 
                 saveToLocalStorage();
                 
@@ -3246,6 +3629,8 @@
             
             // 渲染计划列表
             function renderPlanList(plansToRender = plans, showAll = false) {
+                currentDisplayedPlans = plansToRender;
+                
                 if (plansToRender.length === 0) {
                     planList.innerHTML = `
                         <div class="empty-state">
@@ -3412,10 +3797,7 @@
                 
                 planList.innerHTML = planHTML;
                 
-                // 绑定事件
-                bindPlanItemEvents();
-                
-                // 如果显示全部计划，绑定折叠事件
+                // 绑定折叠事件
                 if (showAll && !filteredByDate && !filteredByFilter) {
                     bindCollapsedEvents();
                 }
@@ -3705,358 +4087,6 @@
                 }
             }
             
-            // 绑定计划项事件
-            function bindPlanItemEvents() {
-                // 复选框事件
-                document.querySelectorAll('.plan-item .custom-checkbox').forEach(checkbox => {
-                    checkbox.addEventListener('change', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan) {
-                            plan.completed = this.checked;
-                            
-                            // 更新UI
-                            const planItem = this.closest('.plan-item');
-                            planItem.classList.toggle('completed', this.checked);
-                            planItem.classList.remove('urgent');
-                            
-                            // 显示或隐藏未完成原因选择器
-                            const reasonSelector = planItem.querySelector('.reason-selector');
-                            if (reasonSelector) {
-                                if (this.checked) {
-                                    reasonSelector.style.display = 'none';
-                                } else {
-                                    reasonSelector.style.display = 'block';
-                                }
-                            }
-                            
-                            updateStats();
-                            saveToLocalStorage();
-                            
-                            // 更新日历
-                            renderCalendar();
-                            
-                            // 重新渲染列表
-                            if (filteredByDate) {
-                                filterPlansByDate(selectedDate);
-                            } else if (filteredByFilter) {
-                                applyFilter();
-                            } else {
-                                renderPlanList(plans, true);
-                            }
-                        }
-                    });
-                });
-                
-                // 批量选择复选框事件
-                document.querySelectorAll('.plan-item .batch-checkbox').forEach(checkbox => {
-                    checkbox.addEventListener('change', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const planItem = this.closest('.plan-item');
-                        
-                        if (this.checked) {
-                            selectedPlans.add(planId);
-                            planItem.classList.add('selected');
-                        } else {
-                            selectedPlans.delete(planId);
-                            planItem.classList.remove('selected');
-                        }
-                        
-                        updateSelectedCount();
-                        updateBatchDeleteButton();
-                    });
-                });
-                
-                // 日期输入事件
-                document.querySelectorAll('.plan-item .start-date, .plan-item .end-date').forEach(input => {
-                    input.addEventListener('change', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan) {
-                            const dateValue = this.value;
-                            const [year, month, day] = dateValue.split('-').map(Number);
-                            
-                            if (this.classList.contains('start-date')) {
-                                plan.startTime.setFullYear(year, month - 1, day);
-                            } else {
-                                plan.endTime.setFullYear(year, month - 1, day);
-                                
-                                // 确保结束时间在开始时间之后
-                                if (plan.endTime <= plan.startTime) {
-                                    plan.endTime.setDate(plan.endTime.getDate() + 1);
-                                    this.value = formatDateForInput(plan.endTime);
-                                }
-                            }
-                            
-                            // 更新计划类型
-                            plan.planType = getPlanType(plan.startTime, plan.endTime);
-                            
-                            // 重置通知状态
-                            plan.notified = false;
-                            saveToLocalStorage();
-                            updateStats();
-                            
-                            // 更新日历
-                            renderCalendar();
-                            
-                            // 重新渲染列表
-                            sortAndRenderPlans();
-                        }
-                    });
-                });
-                
-                // 时间输入事件
-                document.querySelectorAll('.plan-item .start-time, .plan-item .end-time').forEach(input => {
-                    input.addEventListener('change', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan) {
-                            const timeValue = this.value;
-                            const [hours, minutes] = timeValue.split(':').map(Number);
-                            
-                            if (this.classList.contains('start-time')) {
-                                plan.startTime.setHours(hours, minutes, 0, 0);
-                                plan.hasSpecificTime = true;
-                            } else {
-                                plan.endTime.setHours(hours, minutes, 0, 0);
-                                plan.hasSpecificTime = true;
-                                
-                                // 确保结束时间在开始时间之后
-                                if (plan.endTime <= plan.startTime) {
-                                    plan.endTime.setDate(plan.endTime.getDate() + 1);
-                                    this.value = formatTime(plan.endTime);
-                                }
-                            }
-                            
-                            // 更新计划类型
-                            plan.planType = getPlanType(plan.startTime, plan.endTime);
-                            
-                            // 重置通知状态
-                            plan.notified = false;
-                            saveToLocalStorage();
-                            updateStats();
-                            
-                            // 更新日历
-                            renderCalendar();
-                            
-                            // 重新渲染列表
-                            sortAndRenderPlans();
-                        }
-                    });
-                });
-                
-                // 任务内容编辑事件
-                document.querySelectorAll('.plan-item .plan-content').forEach(div => {
-                    div.addEventListener('blur', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan) {
-                            plan.content = this.innerText.trim() || plan.content;
-                            saveToLocalStorage();
-                        }
-                    });
-                });
-                
-                // 备注编辑事件
-                document.querySelectorAll('.plan-item .plan-notes').forEach(div => {
-                    div.addEventListener('blur', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan) {
-                            plan.notes = this.innerText.trim();
-                            saveToLocalStorage();
-                        }
-                    });
-                });
-                
-                // 未完成原因选择事件
-                document.querySelectorAll('.plan-item .reason-select').forEach(select => {
-                    select.addEventListener('change', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan) {
-                            plan.incompleteReason = this.value;
-                            
-                            // 如果是"其他"，显示输入框
-                            const otherInput = this.parentElement.querySelector('.other-reason-input');
-                            if (this.value === 'other') {
-                                otherInput.style.display = 'block';
-                                if (plan.otherReason) {
-                                    otherInput.value = plan.otherReason;
-                                }
-                            } else {
-                                otherInput.style.display = 'none';
-                                plan.otherReason = '';
-                            }
-                            
-                            saveToLocalStorage();
-                        }
-                    });
-                });
-                
-                // 其他原因输入事件
-                document.querySelectorAll('.plan-item .other-reason-input').forEach(input => {
-                    input.addEventListener('blur', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan) {
-                            plan.otherReason = this.value.trim();
-                            saveToLocalStorage();
-                        }
-                    });
-                });
-                
-                // 文件上传按钮事件
-                document.querySelectorAll('.plan-item .file-upload-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const fileInput = this.parentElement.parentElement.querySelector('.file-upload-input');
-                        if (fileInput) {
-                            fileInput.click();
-                        }
-                    });
-                });
-                
-                // 文件输入事件
-                document.querySelectorAll('.plan-item .file-upload-input').forEach(input => {
-                    input.addEventListener('change', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan && this.files.length > 0) {
-                            // 读取文件
-                            Array.from(this.files).forEach(file => {
-                                readFileAsBase64(file).then(base64Data => {
-                                    const fileData = {
-                                        name: file.name,
-                                        type: file.type,
-                                        size: file.size,
-                                        lastModified: file.lastModified,
-                                        data: base64Data
-                                    };
-                                    
-                                    if (!plan.files) {
-                                        plan.files = [];
-                                    }
-                                    
-                                    plan.files.push(fileData);
-                                    saveToLocalStorage();
-                                    
-                                    // 重新渲染该计划项
-                                    const planItem = document.querySelector(`.plan-item[data-id="${planId}"]`);
-                                    if (planItem) {
-                                        const newPlanItemHTML = renderPlanItem(plan);
-                                        planItem.outerHTML = newPlanItemHTML;
-                                        bindPlanItemEvents();
-                                    }
-                                    
-                                    Toastify({
-                                        text: `已添加文件: ${file.name}`,
-                                        duration: 3000,
-                                        gravity: "top",
-                                        position: "center",
-                                        backgroundColor: "linear-gradient(to right, #00b09b, #96c93d)",
-                                    }).showToast();
-                                }).catch(error => {
-                                    console.error('读取文件失败:', error);
-                                    alert('读取文件失败，请重试');
-                                });
-                            });
-                            
-                            // 重置文件输入
-                            this.value = '';
-                        }
-                    });
-                });
-                
-                // 文件预览事件
-                document.querySelectorAll('.plan-item .preview-file').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const planId = parseInt(this.getAttribute('data-plan-id'));
-                        const fileIndex = parseInt(this.getAttribute('data-file-index'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan && plan.files && plan.files[fileIndex]) {
-                            previewFile(plan.files[fileIndex]);
-                        }
-                    });
-                });
-                
-                // 文件删除事件
-                document.querySelectorAll('.plan-item .delete-file').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const planId = parseInt(this.getAttribute('data-plan-id'));
-                        const fileIndex = parseInt(this.getAttribute('data-file-index'));
-                        const plan = plans.find(p => p.id === planId);
-                        
-                        if (plan && plan.files && plan.files[fileIndex]) {
-                            if (confirm(`确定要删除文件 "${plan.files[fileIndex].name}" 吗？`)) {
-                                plan.files.splice(fileIndex, 1);
-                                saveToLocalStorage();
-                                
-                                // 重新渲染该计划项
-                                const planItem = document.querySelector(`.plan-item[data-id="${planId}"]`);
-                                if (planItem) {
-                                    const newPlanItemHTML = renderPlanItem(plan);
-                                    planItem.outerHTML = newPlanItemHTML;
-                                    bindPlanItemEvents();
-                                }
-                                
-                                Toastify({
-                                    text: "文件已删除",
-                                    duration: 3000,
-                                    gravity: "top",
-                                    position: "center",
-                                    backgroundColor: "linear-gradient(to right, #ff5e62, #ff9966)",
-                                }).showToast();
-                            }
-                        }
-                    });
-                });
-                
-                // 删除按钮事件
-                document.querySelectorAll('.plan-item .action-btn.delete').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const planId = parseInt(this.getAttribute('data-id'));
-                        
-                        if (confirm('确定要删除这个计划吗？')) {
-                            plans = plans.filter(p => p.id !== planId);
-                            selectedPlans.delete(planId);
-                            
-                            // 更新日历
-                            renderCalendar();
-                            
-                            // 重新渲染列表
-                            if (filteredByDate) {
-                                filterPlansByDate(selectedDate);
-                            } else if (filteredByFilter) {
-                                applyFilter();
-                            } else {
-                                renderPlanList(plans, true);
-                            }
-                            
-                            updateStats();
-                            saveToLocalStorage();
-                            
-                            Toastify({
-                                text: "计划已删除",
-                                duration: 3000,
-                                gravity: "top",
-                                position: "center",
-                                backgroundColor: "linear-gradient(to right, #ff5e62, #ff9966)",
-                            }).showToast();
-                        }
-                    });
-                });
-            }
-            
             // 读取文件为Base64
             function readFileAsBase64(file) {
                 return new Promise((resolve, reject) => {
@@ -4185,8 +4215,8 @@
                 // 更新日历
                 renderCalendar();
                 
-                // 排序并渲染计划列表
-                sortAndRenderPlans();
+                // 重新渲染当前视图
+                rerenderCurrentView();
                 
                 saveToLocalStorage();
                 
@@ -4203,11 +4233,6 @@
                         }
                     }
                 }, 100);
-            }
-            
-            // 按时间排序
-            function sortPlansByTime() {
-                sortAndRenderPlans();
             }
             
             // 导出为Excel
@@ -4356,13 +4381,8 @@
                     selectedPlans.clear();
                 }
                 
-                if (filteredByDate) {
-                    filterPlansByDate(selectedDate);
-                } else if (filteredByFilter) {
-                    applyFilter();
-                } else {
-                    renderPlanList(plans, true);
-                }
+                // 重新渲染当前视图
+                rerenderCurrentView();
                 
                 updateSelectedCount();
                 updateBatchDeleteButton();
@@ -4380,23 +4400,18 @@
             
             // 全选计划
             function selectAllPlans() {
-                if (selectedPlans.size === plans.length) {
+                if (selectedPlans.size === currentDisplayedPlans.length) {
                     // 如果已经全选，则取消全选
                     selectedPlans.clear();
                 } else {
-                    // 全选所有计划
-                    plans.forEach(plan => {
+                    // 全选当前显示的计划
+                    currentDisplayedPlans.forEach(plan => {
                         selectedPlans.add(plan.id);
                     });
                 }
                 
-                if (filteredByDate) {
-                    filterPlansByDate(selectedDate);
-                } else if (filteredByFilter) {
-                    applyFilter();
-                } else {
-                    renderPlanList(plans, true);
-                }
+                // 重新渲染当前视图
+                rerenderCurrentView();
                 
                 updateSelectedCount();
                 updateBatchDeleteButton();
@@ -4411,13 +4426,8 @@
                 batchDeleteBtn.style.display = 'none';
                 selectedPlans.clear();
                 
-                if (filteredByDate) {
-                    filterPlansByDate(selectedDate);
-                } else if (filteredByFilter) {
-                    applyFilter();
-                } else {
-                    renderPlanList(plans, true);
-                }
+                // 重新渲染当前视图
+                rerenderCurrentView();
             }
             
             // 批量删除计划
@@ -4435,13 +4445,8 @@
                     // 更新日历
                     renderCalendar();
                     
-                    if (filteredByDate) {
-                        filterPlansByDate(selectedDate);
-                    } else if (filteredByFilter) {
-                        applyFilter();
-                    } else {
-                        renderPlanList(plans, true);
-                    }
+                    // 重新渲染当前视图
+                    rerenderCurrentView();
                     
                     updateStats();
                     saveToLocalStorage();
@@ -4854,7 +4859,8 @@
                 const dataToSave = plans.map(plan => ({
                     ...plan,
                     startTime: plan.startTime.getTime(),
-                    endTime: plan.endTime.getTime()
+                    endTime: plan.endTime.getTime(),
+                    files: plan.files || []
                 }));
                 
                 localStorage.setItem('workPlans', JSON.stringify(dataToSave));
@@ -4875,7 +4881,8 @@
                     plans = parsedPlans.map(plan => ({
                         ...plan,
                         startTime: new Date(plan.startTime),
-                        endTime: new Date(plan.endTime)
+                        endTime: new Date(plan.endTime),
+                        files: plan.files || []
                     }));
                     
                     planIdCounter = savedIdCounter ? parseInt(savedIdCounter) : 1;
@@ -4893,6 +4900,9 @@
                             plan.files = [];
                         }
                     });
+                    
+                    // 保存当前显示的计划
+                    currentDisplayedPlans = plans;
                     
                     // 排序计划
                     sortAndRenderPlans();
